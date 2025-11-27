@@ -1,13 +1,24 @@
 import 'dart:io';
 import 'package:client/client.dart';
 
-void main() async {
+void main(List<String> args) async {
   print('=== P2P Communication Client ===\n');
+
+  // Get server URL from command-line argument or environment variable
+  String serverUrl = 'ws://localhost:8080';
+  if (args.isNotEmpty) {
+    serverUrl = args[0];
+  } else {
+    final envUrl = Platform.environment['SERVER_URL'];
+    if (envUrl != null && envUrl.isNotEmpty) {
+      serverUrl = envUrl;
+    }
+  }
 
   stdout.write('Enter your name: ');
   final name = stdin.readLineSync()?.trim() ?? 'Anonymous';
 
-  final client = P2PClient();
+  final client = P2PClient(serverUrl: serverUrl);
 
   try {
     await client.connect(name);

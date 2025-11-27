@@ -21,7 +21,17 @@ dart pub get
 dart run bin/main.dart
 ```
 
-The server will start on `ws://localhost:8080`
+The server will start on `ws://localhost:8080` by default.
+
+You can specify a custom port:
+```bash
+dart run bin/main.dart 3000
+```
+
+Or use an environment variable:
+```bash
+PORT=3000 dart run bin/main.dart
+```
 
 ### Running the Client
 
@@ -31,6 +41,18 @@ In a separate terminal:
 cd client
 dart pub get
 dart run bin/main.dart
+```
+
+The client will connect to `ws://localhost:8080` by default.
+
+You can specify a custom server URL:
+```bash
+dart run bin/main.dart ws://localhost:3000
+```
+
+Or use an environment variable:
+```bash
+SERVER_URL=ws://localhost:3000 dart run bin/main.dart
 ```
 
 You can run multiple client instances to test peer-to-peer communication.
