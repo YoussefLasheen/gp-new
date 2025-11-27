@@ -1,3 +1,0 @@
-name: test
-environment:
-  sdk: '^3.9.0'
