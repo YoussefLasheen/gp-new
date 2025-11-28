@@ -12,6 +12,16 @@ const _defineServiceAccountFile =
     String.fromEnvironment('FIREBASE_SERVICE_ACCOUNT_FILE');
 
 void main(List<String> args) async {
+  if (_defineHost.isEmpty ||
+      _definePort.isEmpty ||
+      _defineFirebaseProjectId.isEmpty ||
+      _defineServiceAccountFile.isEmpty ||
+      !File(_defineServiceAccountFile).existsSync()) {
+    stdout.writeln(
+      'Warning: Required environment variables not configured. FCM notifications are disabled.',
+    );
+    return;
+  }
   final host = _defineHost;
   final portEnv = _definePort;
   final port = int.tryParse(portEnv) ?? 8080;
@@ -19,18 +29,6 @@ void main(List<String> args) async {
 
   final firebaseProjectId = _defineFirebaseProjectId;
   final firebaseCredentialsPath = _defineServiceAccountFile;
-
-  if (firebaseProjectId.isEmpty || firebaseCredentialsPath.isEmpty) {
-    stdout.writeln(
-      'Warning: Firebase credentials not configured. FCM notifications are disabled.',
-    );
-    return;
-  }
-  if (!File(firebaseCredentialsPath).existsSync()) {
-    stderr.writeln(
-        'Firebase credentials file not found at $firebaseCredentialsPath. ');
-    return;
-  }
 
   final credential =
       Credential.fromServiceAccount(File(firebaseCredentialsPath));
