@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "598066918996",
+    "project_id": "graduation-project-as2",
+    "storage_bucket": "graduation-project-as2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:598066918996:android:091e563f00be0db04e1fc1",
+        "android_client_info": {
+          "package_name": "dev.lasheen.client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4sN455EIdHQwBSR7cMLwn1g51JK6Jui4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

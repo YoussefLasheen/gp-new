@@ -7,29 +7,53 @@
       "name": "signaling_server",
       "version": "1.0.0",
       "dependencies": [
+        "dotenv",
+        "http",
         "shelf",
-        "shelf_web_socket",
-        "web_socket_channel"
+        "shelf_cors_headers",
+        "shelf_router"
       ],
-      "devDependencies": []
+      "devDependencies": [
+        "lints"
+      ]
     },
     {
-      "name": "web_socket_channel",
-      "version": "2.4.5",
+      "name": "lints",
+      "version": "3.0.0",
+      "dependencies": []
+    },
+    {
+      "name": "dotenv",
+      "version": "3.0.0",
+      "dependencies": [
+        "args",
+        "meta"
+      ]
+    },
+    {
+      "name": "http",
+      "version": "1.6.0",
       "dependencies": [
         "async",
-        "crypto",
-        "stream_channel",
+        "http_parser",
+        "meta",
         "web"
       ]
     },
     {
-      "name": "shelf_web_socket",
-      "version": "2.0.1",
+      "name": "shelf_cors_headers",
+      "version": "0.1.5",
       "dependencies": [
-        "shelf",
-        "stream_channel",
-        "web_socket_channel"
+        "shelf"
+      ]
+    },
+    {
+      "name": "shelf_router",
+      "version": "1.1.4",
+      "dependencies": [
+        "http_methods",
+        "meta",
+        "shelf"
       ]
     },
     {
@@ -45,21 +69,27 @@
       ]
     },
     {
-      "name": "web",
-      "version": "0.5.1",
+      "name": "meta",
+      "version": "1.17.0",
       "dependencies": []
     },
     {
-      "name": "stream_channel",
-      "version": "2.1.4",
-      "dependencies": [
-        "async"
-      ]
+      "name": "args",
+      "version": "2.7.0",
+      "dependencies": []
     },
     {
-      "name": "crypto",
-      "version": "3.0.7",
+      "name": "web",
+      "version": "1.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "http_parser",
+      "version": "4.1.2",
       "dependencies": [
+        "collection",
+        "source_span",
+        "string_scanner",
         "typed_data"
       ]
     },
@@ -69,6 +99,18 @@
       "dependencies": [
         "collection",
         "meta"
+      ]
+    },
+    {
+      "name": "http_methods",
+      "version": "1.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "stream_channel",
+      "version": "2.1.4",
+      "dependencies": [
+        "async"
       ]
     },
     {
@@ -84,16 +126,6 @@
       "dependencies": []
     },
     {
-      "name": "http_parser",
-      "version": "4.1.2",
-      "dependencies": [
-        "collection",
-        "source_span",
-        "string_scanner",
-        "typed_data"
-      ]
-    },
-    {
       "name": "collection",
       "version": "1.19.1",
       "dependencies": []
@@ -104,11 +136,6 @@
       "dependencies": [
         "collection"
       ]
-    },
-    {
-      "name": "meta",
-      "version": "1.17.0",
-      "dependencies": []
     },
     {
       "name": "string_scanner",

@@ -1,166 +1,202 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:shelf/shelf.dart';
-import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:shelf_web_socket/shelf_web_socket.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:shelf_router/shelf_router.dart';
+import 'package:shelf_cors_headers/shelf_cors_headers.dart';
+import 'package:http/http.dart' as http;
 
 class SignalingServer {
-  final Map<String, WebSocketChannel> _clients = {};
-  final Map<String, String> _clientNames = {};
-  final int port;
+  final Map<String, DeviceInfo> _devices = {};
+  final String? fcmServerKey;
 
-  SignalingServer({this.port = 8080});
+  SignalingServer({this.fcmServerKey});
 
-  Future<void> start() async {
-    final handler = webSocketHandler((WebSocketChannel channel) {
-      String? clientId;
-      
-      channel.stream.listen(
-        (message) {
-          try {
-            final data = jsonDecode(message as String) as Map<String, dynamic>;
-            final type = data['type'] as String;
+  Router get router {
+    final router = Router();
 
-            switch (type) {
-              case 'register':
-                clientId = data['clientId'] as String? ?? _generateClientId();
-                final clientName = data['name'] as String? ?? clientId!;
-                final id = clientId!;
-                _clients[id] = channel;
-                _clientNames[id] = clientName;
-                
-                // Send confirmation
-                channel.sink.add(jsonEncode({
-                  'type': 'registered',
-                  'clientId': id,
-                  'name': clientName,
-                }));
+    // Add device endpoint
+    router.post('/users', (Request request) async {
+      try {
+        final body = await request.readAsString();
+        final data = jsonDecode(body) as Map<String, dynamic>;
+        
+        final deviceId = data['deviceId'] as String?;
+        final deviceName = data['deviceName'] as String?;
+        final fcmToken = data['fcmToken'] as String?;
 
-                // Notify all other clients
-                _broadcastToOthers(id, {
-                  'type': 'client_joined',
-                  'clientId': id,
-                  'name': clientName,
-                });
+        if (deviceId == null || deviceName == null) {
+          return Response.badRequest(
+            body: jsonEncode({'error': 'deviceId and deviceName are required'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
 
-                // Send list of existing clients
-                _sendClientList(channel);
-                break;
+        final deviceInfo = DeviceInfo(
+          deviceId: deviceId,
+          deviceName: deviceName,
+          fcmToken: fcmToken,
+          registeredAt: DateTime.now(),
+        );
 
-              case 'get_clients':
-                _sendClientList(channel);
-                break;
+        _devices[deviceId] = deviceInfo;
 
-              case 'connect_request':
-                final targetId = data['targetId'] as String;
-                if (_clients.containsKey(targetId)) {
-                  _clients[targetId]?.sink.add(jsonEncode({
-                    'type': 'connection_request',
-                    'fromId': clientId,
-                    'fromName': _clientNames[clientId],
-                  }));
-                } else {
-                  channel.sink.add(jsonEncode({
-                    'type': 'error',
-                    'message': 'Client not found',
-                  }));
-                }
-                break;
+        return Response.ok(
+          jsonEncode({
+            'success': true,
+            'deviceId': deviceId,
+            'message': 'Device registered successfully',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'error': e.toString()}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+    });
 
-              case 'connection_response':
-                final targetId = data['targetId'] as String;
-                final accepted = data['accepted'] as bool;
-                if (_clients.containsKey(targetId)) {
-                  _clients[targetId]?.sink.add(jsonEncode({
-                    'type': 'connection_response',
-                    'fromId': clientId,
-                    'fromName': _clientNames[clientId],
-                    'accepted': accepted,
-                  }));
-                }
-                break;
+    // List devices endpoint
+    router.get('/users', (Request request) async {
+      final devicesList = _devices.values.map((device) => {
+        'deviceId': device.deviceId,
+        'deviceName': device.deviceName,
+        'registeredAt': device.registeredAt.toIso8601String(),
+      }).toList();
 
-              case 'message':
-                final targetId = data['targetId'] as String;
-                final message = data['message'] as String;
-                if (_clients.containsKey(targetId)) {
-                  _clients[targetId]?.sink.add(jsonEncode({
-                    'type': 'message',
-                    'fromId': clientId,
-                    'fromName': _clientNames[clientId],
-                    'message': message,
-                  }));
-                } else {
-                  channel.sink.add(jsonEncode({
-                    'type': 'error',
-                    'message': 'Client not found',
-                  }));
-                }
-                break;
-            }
-          } catch (e) {
-            channel.sink.add(jsonEncode({
-              'type': 'error',
-              'message': 'Invalid message format: $e',
-            }));
-          }
-        },
-        onError: (error) {
-          print('WebSocket error: $error');
-        },
-        onDone: () {
-          if (clientId != null) {
-            _handleClientDisconnect(clientId!);
-          }
-        },
+      return Response.ok(
+        jsonEncode({
+          'success': true,
+          'devices': devicesList,
+          'count': devicesList.length,
+        }),
+        headers: {'Content-Type': 'application/json'},
       );
     });
 
-    final pipeline = const Pipeline().addMiddleware(logRequests()).addHandler(handler);
+    // Send connection request via FCM
+    router.post('/users/<deviceId>/connect', (Request request, String deviceId) async {
+      try {
+        final targetDevice = _devices[deviceId];
+        if (targetDevice == null) {
+          return Response(
+            404,
+            body: jsonEncode({'error': 'Device not found'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
 
-    await shelf_io.serve(
-      pipeline,
-      InternetAddress.anyIPv4,
-      port,
-    );
+        if (targetDevice.fcmToken == null) {
+          return Response.badRequest(
+            body: jsonEncode({'error': 'Device has no FCM token'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
 
-    print('Signaling server running on ws://localhost:$port');
-  }
+        if (fcmServerKey == null) {
+          return Response.internalServerError(
+            body: jsonEncode({'error': 'FCM server key not configured'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
 
-  void _sendClientList(WebSocketChannel channel) {
-    final clients = _clients.keys.map((id) => {
-      'clientId': id,
-      'name': _clientNames[id] ?? id,
-    }).toList();
+        final body = await request.readAsString();
+        final data = jsonDecode(body) as Map<String, dynamic>;
+        final fromDeviceId = data['fromDeviceId'] as String?;
+        final fromDeviceName = data['fromDeviceName'] as String?;
 
-    channel.sink.add(jsonEncode({
-      'type': 'client_list',
-      'clients': clients,
-    }));
-  }
+        if (fromDeviceId == null) {
+          return Response.badRequest(
+            body: jsonEncode({'error': 'fromDeviceId is required'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
 
-  void _broadcastToOthers(String excludeId, Map<String, dynamic> message) {
-    _clients.forEach((id, channel) {
-      if (id != excludeId) {
-        channel.sink.add(jsonEncode(message));
+        // Send FCM notification
+        final fcmResponse = await _sendFcmNotification(
+          fcmToken: targetDevice.fcmToken!,
+          fromDeviceId: fromDeviceId,
+          fromDeviceName: fromDeviceName ?? 'Unknown',
+        );
+
+        if (fcmResponse.statusCode == 200) {
+          return Response.ok(
+            jsonEncode({
+              'success': true,
+              'message': 'Connection request sent',
+            }),
+            headers: {'Content-Type': 'application/json'},
+          );
+        } else {
+          return Response.internalServerError(
+            body: jsonEncode({
+              'error': 'Failed to send FCM notification',
+              'details': await fcmResponse.body,
+            }),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'error': e.toString()}),
+          headers: {'Content-Type': 'application/json'},
+        );
       }
     });
+
+    return router;
   }
 
-  void _handleClientDisconnect(String clientId) {
-    _clients.remove(clientId);
-    _clientNames.remove(clientId);
+  Future<http.Response> _sendFcmNotification({
+    required String fcmToken,
+    required String fromDeviceId,
+    required String fromDeviceName,
+  }) async {
+    final url = Uri.parse('https://fcm.googleapis.com/fcm/send');
     
-    _broadcastToOthers(clientId, {
-      'type': 'client_left',
-      'clientId': clientId,
-    });
+    final payload = {
+      'to': fcmToken,
+      'notification': {
+        'title': 'Connection Request',
+        'body': '$fromDeviceName wants to connect',
+      },
+      'data': {
+        'type': 'connection_request',
+        'fromDeviceId': fromDeviceId,
+        'fromDeviceName': fromDeviceName,
+      },
+    };
+
+    return await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'key=$fcmServerKey',
+      },
+      body: jsonEncode(payload),
+    );
   }
 
-  String _generateClientId() {
-    return DateTime.now().millisecondsSinceEpoch.toString();
+  Handler get handler {
+    final pipeline = Pipeline()
+        .addMiddleware(logRequests())
+        .addMiddleware(corsHeaders())
+        .addHandler(router);
+
+    return pipeline;
   }
+}
+
+class DeviceInfo {
+  final String deviceId;
+  final String deviceName;
+  final String? fcmToken;
+  final DateTime registeredAt;
+
+  DeviceInfo({
+    required this.deviceId,
+    required this.deviceName,
+    this.fcmToken,
+    required this.registeredAt,
+  });
 }
 

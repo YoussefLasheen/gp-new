@@ -1,19 +1,22 @@
-# P2P Communication Test Project
+# WebRTC Peer-to-Peer Communication Test
 
-This monorepo contains a peer-to-peer communication test system with a signaling server and CLI client.
+This monorepo contains a WebRTC peer-to-peer communication test project with a signaling server and client application.
 
-## Structure
+## Project Structure
 
-- `signaling-server/` - WebSocket signaling server in Dart
-- `client/` - CLI client application for connecting and messaging
+- `signaling-server/` - Dart-based signaling server
+- `client/` - Flutter client application
 
-## Getting Started
+## Signaling Server
 
-### Prerequisites
+The signaling server handles device registration and WebRTC signaling.
 
-- Dart SDK (>=3.0.0)
+### Features
+- Device registration endpoint
+- List all registered devices
+- FCM integration for sending connection requests
 
-### Running the Signaling Server
+### Setup
 
 ```bash
 cd signaling-server
@@ -21,54 +24,29 @@ dart pub get
 dart run bin/main.dart
 ```
 
-The server will start on `ws://localhost:8080` by default.
+## Client App
 
-You can specify a custom port:
-```bash
-dart run bin/main.dart 3000
-```
+The Flutter client application for peer-to-peer communication.
 
-Or use an environment variable:
-```bash
-PORT=3000 dart run bin/main.dart
-```
+### Features
+- User sign up
+- Automatic user info sending on app start
+- List of all registered users
 
-### Running the Client
-
-In a separate terminal:
+### Setup
 
 ```bash
 cd client
-dart pub get
-dart run bin/main.dart
+flutter pub get
+flutter run
 ```
 
-The client will connect to `ws://localhost:8080` by default.
+## Configuration
 
-You can specify a custom server URL:
-```bash
-dart run bin/main.dart ws://localhost:3000
-```
+### FCM Setup
 
-Or use an environment variable:
-```bash
-SERVER_URL=ws://localhost:3000 dart run bin/main.dart
-```
-
-You can run multiple client instances to test peer-to-peer communication.
-
-## Client Commands
-
-- `list` - Show all connected clients
-- `connect <clientId>` - Request connection to a specific client
-- `msg <clientId> <message>` - Send a message to a connected client
-- `quit` - Disconnect and exit
-
-## How It Works
-
-1. Clients connect to the signaling server via WebSocket
-2. Clients register with a name and receive a unique client ID
-3. Clients can see a list of all connected clients
-4. Clients can request connections to other clients
-5. Clients can send messages to connected clients through the signaling server
+1. Create a Firebase project
+2. Download `google-services.json` for Android and `GoogleService-Info.plist` for iOS
+3. Place them in the appropriate directories in the client app
+4. Add your FCM server key to the signaling server configuration
 

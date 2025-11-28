@@ -1,10 +1,24 @@
 name: client
-description: A CLI client for peer-to-peer communication
-version: 1.0.0
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ^3.9.2
 
 dependencies:
-  web_socket_channel: ^2.4.0
-  io: ^1.0.4
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.9
+  uuid: ^4.3.3
+  device_info_plus: ^9.1.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
 
+flutter:
+  uses-material-design: true

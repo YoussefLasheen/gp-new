@@ -1,27 +1,37 @@
 import 'dart:io';
 import 'package:signaling_server/server.dart';
+import 'package:dotenv/dotenv.dart' as dotenv;
+import 'package:shelf/shelf_io.dart' as shelf_io;
 
 void main(List<String> args) async {
-  // Get port from command-line argument or environment variable
-  int port = 8080;
-  if (args.isNotEmpty) {
-    final portArg = int.tryParse(args[0]);
-    if (portArg != null) {
-      port = portArg;
-    } else {
-      print('Invalid port: ${args[0]}. Using default port 8080.');
-    }
-  } else {
-    final envPort = Platform.environment['PORT'];
-    if (envPort != null) {
-      final portEnv = int.tryParse(envPort);
-      if (portEnv != null) {
-        port = portEnv;
-      }
-    }
+  // Load environment variables
+  dotenv.load();
+
+  final fcmServerKey = dotenv.env['FCM_SERVER_KEY'];
+
+  final server = SignalingServer(fcmServerKey: fcmServerKey);
+  
+  final port = int.parse(dotenv.env['PORT'] ?? '8080');
+  final host = InternetAddress(dotenv.env['HOST'] ?? 'localhost');
+
+  print('Starting signaling server on ${host.address}:$port');
+  if (fcmServerKey == null) {
+    print('Warning: FCM_SERVER_KEY not set. FCM notifications will not work.');
   }
 
-  final server = SignalingServer(port: port);
-  await server.start();
+  final serverInstance = await shelf_io.serve(
+    server.handler,
+    host,
+    port,
+  );
+
+  print('Server running on http://${serverInstance.address.address}:${serverInstance.port}');
+  
+  // Handle shutdown gracefully
+  ProcessSignal.sigint.watch().listen((signal) {
+    print('\nShutting down server...');
+    serverInstance.close();
+    exit(0);
+  });
 }
 
