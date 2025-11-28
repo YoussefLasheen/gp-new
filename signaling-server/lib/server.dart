@@ -101,7 +101,7 @@ class SignalingServer {
             );
           } catch (e) {
             // Log FCM failures for visibility
-            print('Failed to send FCM data message: $e');
+            print('Failed to send FCM data message: $e with data: $data');
             return Response.internalServerError(
               body: jsonEncode({
                 'error': 'Failed to send FCM message',
