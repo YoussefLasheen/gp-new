@@ -3,7 +3,7 @@ import 'dart:convert';
 
 class ApiService {
   // Update this to match your server URL
-  static const String baseUrl = 'http://localhost:8080';
+  static const String baseUrl = '129.151.254.155:9000';
 
   static Future<Map<String, dynamic>> registerDevice({
     required String deviceId,
@@ -12,7 +12,7 @@ class ApiService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/users'),
+        Uri.http(baseUrl, '/users'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'deviceId': deviceId,
@@ -34,7 +34,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getUsers() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/users'),
+        Uri.http(baseUrl, '/users'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -57,7 +57,7 @@ class ApiService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/users/$targetDeviceId/connect'),
+        Uri.http(baseUrl, '/users/$targetDeviceId/connect'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'fromDeviceId': fromDeviceId,
@@ -86,10 +86,7 @@ class ApiService {
     String? sdpMLineIndex,
   }) async {
     try {
-      final payload = {
-        'fromDeviceId': fromDeviceId,
-        'signalType': signalType,
-      };
+      final payload = {'fromDeviceId': fromDeviceId, 'signalType': signalType};
 
       if (sdp != null && type != null) {
         payload['sdp'] = sdp;
@@ -103,7 +100,7 @@ class ApiService {
       }
 
       final response = await http.post(
-        Uri.parse('$baseUrl/webrtc/$targetDeviceId/signal'),
+        Uri.http(baseUrl, '/webrtc/$targetDeviceId/signal'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       );
@@ -123,7 +120,7 @@ class ApiService {
   }) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/webrtc/$deviceId/signals'),
+        Uri.http(baseUrl, '/webrtc/$deviceId/signals'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -137,4 +134,3 @@ class ApiService {
     }
   }
 }
-

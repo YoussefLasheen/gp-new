@@ -19,6 +19,12 @@ dart run \
   bin/main.dart
 ```
 
+dart run \
+ --define=PORT=9000 \
+ --define=FIREBASE_PROJECT_ID=graduation-project-as2 \
+ --define=FIREBASE_SERVICE_ACCOUNT_FILE="$HOME/gp/graduation-project-as2-firebase-adminsdk-fbsvc-f0f1b6d682.json" \
+ bin/main.dart
+
    - **HOST**: Interface to bind to (defaults to `localhost` if not provided).
    - **PORT**: Port number (defaults to `8080` if not provided).
    - **FIREBASE_PROJECT_ID**: Firebase project ID used by the Admin SDK.

@@ -24,6 +24,38 @@ dart pub get
 dart run bin/main.dart
 ```
 
+### Testing with curl
+
+Replace `localhost:8080` if you override the server port or host.
+
+```bash
+# Register a device
+curl -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d '{"deviceId":"device-1","deviceName":"Alice","fcmToken":"optional-fcm-token"}'
+
+# List all registered devices
+curl http://129.151.254.155:9000/users
+
+# Send a WebRTC signal (offer/answer/candidate) to another device
+curl -X POST http://localhost:8080/webrtc/device-2/signal \
+  -H "Content-Type: application/json" \
+  -d '{
+        "fromDeviceId":"device-1",
+        "signalType":"offer",
+        "sdp":"<base64-or-plain-sdp>",
+        "type":"offer"
+      }'
+
+# Fetch pending signals for a device (clears the queue)
+curl http://localhost:8080/webrtc/device-2/signals
+
+# Trigger an FCM connection request (requires FCM env vars + token)
+curl -X POST http://localhost:8080/users/device-2/connect \
+  -H "Content-Type: application/json" \
+  -d '{"fromDeviceId":"device-1","fromDeviceName":"Alice"}'
+```
+
 ## Client App
 
 The Flutter client application for peer-to-peer communication.
