@@ -89,35 +89,15 @@ class SignalingServer {
         }
 
         final body = await request.readAsString();
-        final data = jsonDecode(body) as Map<String, dynamic>;
-        final fromDeviceId = data['fromDeviceId'] as String?;
-        final signalType = data['signalType'] as String?;
-
-        if (fromDeviceId == null || signalType == null) {
-          return Response.badRequest(
-            body: jsonEncode(
-                {'error': 'fromDeviceId and signalType are required'}),
-            headers: {'Content-Type': 'application/json'},
-          );
-        }
+        final data = jsonDecode(body) as Map<String, String>;
 
         // Send FCM data message directly with SDP/ICE candidate data included
         // No need to store signals since everything goes through FCM
         if (targetDevice.fcmToken != null && messaging != null) {
-          final fromDevice = _devices[fromDeviceId];
-          final fromDeviceName = fromDevice?.deviceName ?? 'Unknown';
-
           try {
             await _sendFcmDataMessage(
               fcmToken: targetDevice.fcmToken!,
-              fromDeviceId: fromDeviceId,
-              fromDeviceName: fromDeviceName,
-              signalType: signalType,
-              sdp: data['sdp'] as String?,
-              type: data['type'] as String?,
-              candidate: data['candidate'] as String?,
-              sdpMid: data['sdpMid'] as String?,
-              sdpMLineIndex: data['sdpMLineIndex'] as String?,
+              data: data,
             );
           } catch (e) {
             // Log FCM failures for visibility
@@ -239,38 +219,11 @@ class SignalingServer {
 
   Future<String> _sendFcmDataMessage({
     required String fcmToken,
-    required String fromDeviceId,
-    required String fromDeviceName,
-    required String signalType,
-    String? sdp,
-    String? type,
-    String? candidate,
-    String? sdpMid,
-    String? sdpMLineIndex,
+    required Map<String, String> data,
   }) async {
     final messagingClient = messaging;
     if (messagingClient == null) {
       throw StateError('FCM messaging not configured');
-    }
-
-    // Build data payload with all WebRTC signal information
-    final data = <String, String>{
-      'type': signalType,
-      'fromDeviceId': fromDeviceId,
-      'fromDeviceName': fromDeviceName,
-    };
-
-    // Add SDP data if present (for offer/answer)
-    if (sdp != null && type != null) {
-      data['sdp'] = sdp;
-      data['sdpType'] = type;
-    }
-
-    // Add ICE candidate data if present
-    if (candidate != null && sdpMid != null && sdpMLineIndex != null) {
-      data['candidate'] = candidate;
-      data['sdpMid'] = sdpMid;
-      data['sdpMLineIndex'] = sdpMLineIndex;
     }
 
     // Send data-only message (no notification) for WebRTC signals
@@ -278,7 +231,6 @@ class SignalingServer {
       TokenMessage(
         token: fcmToken,
         data: data,
-        // No notification - this is a silent data message
       ),
     );
   }
