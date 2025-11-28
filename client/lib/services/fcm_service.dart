@@ -206,7 +206,8 @@ class FCMService {
   }
 
   static void stopPolling() {
-    // No longer needed, but kept for compatibility
+    // No longer needed - all signaling goes through FCM data messages
+    // Kept for compatibility with existing code
   }
 }
 

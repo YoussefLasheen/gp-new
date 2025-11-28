@@ -6,7 +6,6 @@ import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 
 class SignalingServer {
   final Map<String, DeviceInfo> _devices = {};
-  final Map<String, List<Map<String, dynamic>>> _pendingSignals = {};
   final Messaging? messaging;
 
   SignalingServer({this.messaging});
@@ -76,7 +75,7 @@ class SignalingServer {
       );
     });
 
-    // WebRTC signaling endpoint
+    // WebRTC signaling endpoint - sends FCM messages directly with SDP included
     router.post('/webrtc/<deviceId>/signal',
         (Request request, String deviceId) async {
       try {
@@ -102,33 +101,8 @@ class SignalingServer {
           );
         }
 
-        // Store signal for the target device
-        if (!_pendingSignals.containsKey(deviceId)) {
-          _pendingSignals[deviceId] = [];
-        }
-
-        final signal = {
-          'fromDeviceId': fromDeviceId,
-          'signalType': signalType,
-          'timestamp': DateTime.now().toIso8601String(),
-        };
-
-        if (data.containsKey('sdp') && data.containsKey('type')) {
-          signal['sdp'] = data['sdp'] as String;
-          signal['type'] = data['type'] as String;
-        }
-
-        if (data.containsKey('candidate') &&
-            data.containsKey('sdpMid') &&
-            data.containsKey('sdpMLineIndex')) {
-          signal['candidate'] = data['candidate'] as String;
-          signal['sdpMid'] = data['sdpMid'] as String;
-          signal['sdpMLineIndex'] = data['sdpMLineIndex'].toString();
-        }
-
-        _pendingSignals[deviceId]!.add(signal);
-
-        // Send FCM data message for WebRTC signals (offer, answer, ice-candidate)
+        // Send FCM data message directly with SDP/ICE candidate data included
+        // No need to store signals since everything goes through FCM
         if (targetDevice.fcmToken != null && messaging != null) {
           final fromDevice = _devices[fromDeviceId];
           final fromDeviceName = fromDevice?.deviceName ?? 'Unknown';
@@ -139,47 +113,36 @@ class SignalingServer {
               fromDeviceId: fromDeviceId,
               fromDeviceName: fromDeviceName,
               signalType: signalType,
-              sdp: signal['sdp'],
-              type: signal['type'],
-              candidate: signal['candidate'],
-              sdpMid: signal['sdpMid'],
-              sdpMLineIndex: signal['sdpMLineIndex'],
+              sdp: data['sdp'] as String?,
+              type: data['type'] as String?,
+              candidate: data['candidate'] as String?,
+              sdpMid: data['sdpMid'] as String?,
+              sdpMLineIndex: data['sdpMLineIndex'] as String?,
             );
           } catch (e) {
-            // Ignore FCM failures but log for visibility.
+            // Log FCM failures for visibility
             print('Failed to send FCM data message: $e');
+            return Response.internalServerError(
+              body: jsonEncode({
+                'error': 'Failed to send FCM message',
+                'message': e.toString(),
+              }),
+              headers: {'Content-Type': 'application/json'},
+            );
           }
+        } else {
+          return Response.badRequest(
+            body: jsonEncode({
+              'error': 'Target device has no FCM token or FCM not configured',
+            }),
+            headers: {'Content-Type': 'application/json'},
+          );
         }
 
         return Response.ok(
           jsonEncode({
             'success': true,
-            'message': 'Signal stored',
-          }),
-          headers: {'Content-Type': 'application/json'},
-        );
-      } catch (e) {
-        return Response.internalServerError(
-          body: jsonEncode({'error': e.toString()}),
-          headers: {'Content-Type': 'application/json'},
-        );
-      }
-    });
-
-    // Get pending WebRTC signals for a device
-    router.get('/webrtc/<deviceId>/signals',
-        (Request request, String deviceId) async {
-      try {
-        final signals = _pendingSignals[deviceId] ?? [];
-
-        // Clear signals after retrieving
-        _pendingSignals[deviceId] = [];
-
-        return Response.ok(
-          jsonEncode({
-            'success': true,
-            'signals': signals,
-            'count': signals.length,
+            'message': 'FCM message sent',
           }),
           headers: {'Content-Type': 'application/json'},
         );

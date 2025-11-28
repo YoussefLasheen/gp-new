@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'fcm_service.dart';
@@ -9,7 +8,6 @@ import 'fcm_service.dart';
 class WebRTCService {
   RTCPeerConnection? _peerConnection;
   RTCDataChannel? _dataChannel;
-  WebSocketChannel? _signalingChannel;
   String? _remoteDeviceId;
 
   // Callbacks
@@ -81,7 +79,7 @@ class WebRTCService {
       // Register with FCMService to receive answer and ICE candidates
       FCMService.setActiveWebRTCService(this, targetDeviceId);
 
-      // Send offer to server (will trigger FCM to target device)
+      // Send offer via FCM (server will forward it as FCM data message with SDP included)
       await ApiService.sendWebRTCSignal(
         targetDeviceId: targetDeviceId,
         fromDeviceId: fromDeviceId,
@@ -223,7 +221,6 @@ class WebRTCService {
     }
   }
 
-
   Future<void> handleIncomingFileTransfer({
     required String fromDeviceId,
     required String sdp,
@@ -278,7 +275,7 @@ class WebRTCService {
       // Register with FCMService to receive ICE candidates
       FCMService.setActiveWebRTCService(this, fromDeviceId);
 
-      // Send answer to server (will trigger FCM to initiator device)
+      // Send answer via FCM (server will forward it as FCM data message with SDP included)
       final prefs = await SharedPreferences.getInstance();
       final myDeviceId = prefs.getString('deviceId');
       if (myDeviceId != null) {
@@ -331,6 +328,7 @@ class WebRTCService {
     if (_remoteDeviceId == null) return;
 
     try {
+      // Send ICE candidate via FCM (server will forward it as FCM data message)
       await ApiService.sendWebRTCSignal(
         targetDeviceId: _remoteDeviceId!,
         fromDeviceId: fromDeviceId,
@@ -352,16 +350,14 @@ class WebRTCService {
   void _cleanup() {
     _dataChannel?.close();
     _peerConnection?.close();
-    _signalingChannel?.sink.close();
     _peerConnection = null;
     _dataChannel = null;
-    _signalingChannel = null;
     _remoteDeviceId = null;
     _fileChunks.clear();
     _currentFileName = null;
     _currentFileSize = null;
     _currentFileBytesReceived = 0;
-    
+
     // Unregister from FCMService
     FCMService.clearActiveWebRTCService();
   }

@@ -75,6 +75,8 @@ class ApiService {
     }
   }
 
+  // Sends WebRTC signal (offer/answer/ICE candidate) via server
+  // Server forwards it as FCM data message with SDP included - no polling needed
   static Future<Map<String, dynamic>> sendWebRTCSignal({
     required String targetDeviceId,
     required String fromDeviceId,
@@ -112,25 +114,6 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Error sending WebRTC signal: $e');
-    }
-  }
-
-  static Future<Map<String, dynamic>> getWebRTCSignals({
-    required String deviceId,
-  }) async {
-    try {
-      final response = await http.get(
-        Uri.http(baseUrl, '/webrtc/$deviceId/signals'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      } else {
-        throw Exception('Failed to get WebRTC signals: ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Error getting WebRTC signals: $e');
     }
   }
 }
