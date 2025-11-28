@@ -1,15 +1,12 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'api_service.dart';
 import 'webrtc_service.dart';
 import '../screens/call_screen.dart';
 
 class FCMService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  static Function(String, String, String)? onIncomingCall;
-  static Timer? _signalPollTimer;
-  static String? _currentDeviceId;
+  static WebRTCService? _activeWebRTCService;
+  static String? _activeRemoteDeviceId;
 
   static Future<String?> getToken() async {
     try {
@@ -36,87 +33,117 @@ class FCMService {
     required String deviceId,
     required BuildContext context,
   }) {
-    _currentDeviceId = deviceId;
-    
-    // Handle foreground messages
+    // Handle foreground messages (data-only, no notification)
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Received message: ${message.messageId}');
-      print('Notification: ${message.notification?.title}');
+      print('Received FCM data message: ${message.messageId}');
       print('Data: ${message.data}');
-      
-      final type = message.data['type'] as String?;
-      final fromDeviceId = message.data['fromDeviceId'] as String?;
-      final fromDeviceName = message.data['fromDeviceName'] as String?;
 
-      if (type == 'webrtc_offer' && fromDeviceId != null && fromDeviceName != null) {
-        // Start polling for WebRTC signals
-        _startSignalPolling(context, fromDeviceId, fromDeviceName);
-      } else if (type == 'connection_request') {
-        print('Connection request from: $fromDeviceName');
-      }
-    });
-
-    // Handle background messages (when app is terminated)
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-    // Handle notification taps
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Notification opened app: ${message.messageId}');
-      final type = message.data['type'] as String?;
-      final fromDeviceId = message.data['fromDeviceId'] as String?;
-      final fromDeviceName = message.data['fromDeviceName'] as String?;
-
-      if (type == 'webrtc_offer' && fromDeviceId != null && fromDeviceName != null) {
-        _startSignalPolling(context, fromDeviceId, fromDeviceName);
-      }
+      _handleFCMDataMessage(message, context);
     });
   }
 
-  static void _startSignalPolling(
+  static void _handleFCMDataMessage(
+    RemoteMessage message,
+    BuildContext context,
+  ) {
+    final type = message.data['type'] as String?;
+    final fromDeviceId = message.data['fromDeviceId'] as String?;
+    final fromDeviceName = message.data['fromDeviceName'] as String?;
+
+    if (type == null || fromDeviceId == null || fromDeviceName == null) {
+      return;
+    }
+
+    // Handle WebRTC offer
+    if (type == 'offer') {
+      final sdp = message.data['sdp'] as String?;
+      final sdpType = message.data['sdpType'] as String?;
+
+      if (sdp != null && sdpType != null && context.mounted) {
+        _showIncomingConnectionSnackbar(
+          context,
+          fromDeviceId,
+          fromDeviceName,
+          sdp,
+          sdpType,
+        );
+      }
+    }
+    // Handle WebRTC answer
+    else if (type == 'answer') {
+      final sdp = message.data['sdp'] as String?;
+      final sdpType = message.data['sdpType'] as String?;
+
+      if (sdp != null && sdpType != null && _activeWebRTCService != null) {
+        // Verify this answer is for the active connection
+        if (_activeRemoteDeviceId == fromDeviceId) {
+          _activeWebRTCService!.handleAnswer(sdp: sdp, type: sdpType);
+        }
+      }
+    }
+    // Handle ICE candidate
+    else if (type == 'ice-candidate') {
+      final candidate = message.data['candidate'] as String?;
+      final sdpMid = message.data['sdpMid'] as String?;
+      final sdpMLineIndex = message.data['sdpMLineIndex'] as String?;
+
+      if (candidate != null &&
+          sdpMid != null &&
+          sdpMLineIndex != null &&
+          _activeWebRTCService != null) {
+        // Verify this ICE candidate is for the active connection
+        if (_activeRemoteDeviceId == fromDeviceId) {
+          _activeWebRTCService!.handleIceCandidate(
+            candidate: candidate,
+            sdpMid: sdpMid,
+            sdpMLineIndex: sdpMLineIndex,
+          );
+        }
+      }
+    }
+    // Handle connection request (legacy)
+    else if (type == 'connection_request') {
+      print('Connection request from: $fromDeviceName');
+    }
+  }
+
+  static void _showIncomingConnectionSnackbar(
     BuildContext context,
     String fromDeviceId,
     String fromDeviceName,
+    String sdp,
+    String type,
   ) {
-    _stopSignalPolling();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
-    _signalPollTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
-      try {
-        if (_currentDeviceId == null) return;
-
-        final response = await ApiService.getWebRTCSignals(deviceId: _currentDeviceId!);
-        final signals = response['signals'] as List?;
-
-        if (signals != null && signals.isNotEmpty) {
-          _stopSignalPolling();
-
-          // Find the offer signal
-          final offerSignal = signals.firstWhere(
-            (signal) => signal['signalType'] == 'offer' && signal['fromDeviceId'] == fromDeviceId,
-            orElse: () => null,
-          );
-
-          if (offerSignal != null && context.mounted) {
-            await _handleIncomingCall(
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text('$fromDeviceName wants to send you a file'),
+        duration: const Duration(seconds: 10),
+        backgroundColor: Colors.blue[700],
+        action: SnackBarAction(
+          label: 'Accept',
+          textColor: Colors.white,
+          onPressed: () async {
+            scaffoldMessenger.hideCurrentSnackBar();
+            await _acceptIncomingConnection(
               context,
               fromDeviceId,
               fromDeviceName,
-              offerSignal['sdp'] as String,
-              offerSignal['type'] as String,
+              sdp,
+              type,
             );
-          }
-        }
-      } catch (e) {
-        print('Error polling signals: $e');
-      }
-    });
+          },
+        ),
+        // Add dismiss callback to handle rejection
+        onVisible: () {
+          // Auto-dismiss after 10 seconds is rejection
+        },
+      ),
+    );
   }
 
-  static void _stopSignalPolling() {
-    _signalPollTimer?.cancel();
-    _signalPollTimer = null;
-  }
-
-  static Future<void> _handleIncomingCall(
+  static Future<void> _acceptIncomingConnection(
     BuildContext context,
     String fromDeviceId,
     String fromDeviceName,
@@ -124,57 +151,36 @@ class FCMService {
     String type,
   ) async {
     try {
-      // Show dialog to accept/reject file transfer request
-      final accepted = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Incoming File Transfer'),
-          content: Text('$fromDeviceName wants to send you a file'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Reject'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Accept'),
-            ),
-          ],
-        ),
+      // Initialize WebRTC service
+      final webrtcService = WebRTCService();
+      await webrtcService.initialize();
+
+      // Store active service for handling answer/ICE candidates
+      _activeWebRTCService = webrtcService;
+      _activeRemoteDeviceId = fromDeviceId;
+
+      // Handle the incoming file transfer offer
+      await webrtcService.handleIncomingFileTransfer(
+        fromDeviceId: fromDeviceId,
+        sdp: sdp,
+        type: type,
       );
 
-      if (accepted == true && context.mounted) {
-        // Initialize WebRTC service
-        final webrtcService = WebRTCService();
-        await webrtcService.initialize();
-
-        // Handle the incoming file transfer offer
-        await webrtcService.handleIncomingFileTransfer(
-          fromDeviceId: fromDeviceId,
-          sdp: sdp,
-          type: type,
-        );
-
-        // Start polling for answer and ICE candidates
-        _startAnswerPolling(context, webrtcService, fromDeviceId);
-
-        // Navigate to file send screen
-        if (context.mounted) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => FileSendScreen(
-                remoteDeviceName: fromDeviceName,
-                remoteDeviceId: fromDeviceId,
-                isIncoming: true,
-                webrtcService: webrtcService,
-              ),
+      // Navigate to file send screen
+      if (context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => FileSendScreen(
+              remoteDeviceName: fromDeviceName,
+              remoteDeviceId: fromDeviceId,
+              isIncoming: true,
+              webrtcService: webrtcService,
             ),
-          );
-        }
+          ),
+        );
       }
     } catch (e) {
-      print('Error handling incoming file transfer: $e');
+      print('Error accepting incoming file transfer: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -186,51 +192,21 @@ class FCMService {
     }
   }
 
-  static void _startAnswerPolling(
-    BuildContext context,
-    WebRTCService webrtcService,
-    String fromDeviceId,
+  static void setActiveWebRTCService(
+    WebRTCService? service,
+    String? remoteDeviceId,
   ) {
-    Timer.periodic(const Duration(seconds: 1), (timer) async {
-      try {
-        if (_currentDeviceId == null) {
-          timer.cancel();
-          return;
-        }
+    _activeWebRTCService = service;
+    _activeRemoteDeviceId = remoteDeviceId;
+  }
 
-        final response = await ApiService.getWebRTCSignals(deviceId: _currentDeviceId!);
-        final signals = response['signals'] as List?;
-
-        if (signals != null) {
-          for (final signal in signals) {
-            final signalType = signal['signalType'] as String;
-            final signalFromDeviceId = signal['fromDeviceId'] as String;
-
-            if (signalFromDeviceId == fromDeviceId) {
-              if (signalType == 'answer') {
-                await webrtcService.handleAnswer(
-                  sdp: signal['sdp'] as String,
-                  type: signal['type'] as String,
-                );
-              } else if (signalType == 'ice-candidate') {
-                await webrtcService.handleIceCandidate(
-                  candidate: signal['candidate'] as String,
-                  sdpMid: signal['sdpMid'] as String,
-                  sdpMLineIndex: signal['sdpMLineIndex'].toString(),
-                );
-              }
-            }
-          }
-        }
-      } catch (e) {
-        print('Error polling answer: $e');
-        timer.cancel();
-      }
-    });
+  static void clearActiveWebRTCService() {
+    _activeWebRTCService = null;
+    _activeRemoteDeviceId = null;
   }
 
   static void stopPolling() {
-    _stopSignalPolling();
+    // No longer needed, but kept for compatibility
   }
 }
 
@@ -238,5 +214,6 @@ class FCMService {
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('Background message received: ${message.messageId}');
   print('Data: ${message.data}');
+  // Note: In background handler, we can't show UI directly
+  // The app will need to handle this when it comes to foreground
 }
-

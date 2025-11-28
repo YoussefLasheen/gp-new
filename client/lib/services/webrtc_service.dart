@@ -4,6 +4,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'fcm_service.dart';
 
 class WebRTCService {
   RTCPeerConnection? _peerConnection;
@@ -77,7 +78,10 @@ class WebRTCService {
       final offer = await _peerConnection!.createOffer();
       await _peerConnection!.setLocalDescription(offer);
 
-      // Send offer to server
+      // Register with FCMService to receive answer and ICE candidates
+      FCMService.setActiveWebRTCService(this, targetDeviceId);
+
+      // Send offer to server (will trigger FCM to target device)
       await ApiService.sendWebRTCSignal(
         targetDeviceId: targetDeviceId,
         fromDeviceId: fromDeviceId,
@@ -85,9 +89,6 @@ class WebRTCService {
         sdp: offer.sdp,
         type: offer.type,
       );
-
-      // Start polling for answer and ICE candidates
-      _startAnswerPolling(fromDeviceId);
     } catch (e) {
       onError?.call('Failed to start file transfer: $e');
       _cleanup();
@@ -151,7 +152,6 @@ class WebRTCService {
     }
   }
 
-  Timer? _answerPollTimer;
   String? _currentFileName;
   int? _currentFileSize;
   int _currentFileBytesReceived = 0;
@@ -159,22 +159,7 @@ class WebRTCService {
 
   void _handleDataChannelMessage(RTCDataChannelMessage message) {
     try {
-      // Check for binary data first (file chunks)
-      final binary = message.binary;
-      if (binary != null) {
-        _fileChunks.add(binary);
-        _currentFileBytesReceived += binary.length;
-
-        if (_currentFileSize != null) {
-          onFileReceiveProgress?.call(
-            _currentFileBytesReceived,
-            _currentFileSize!,
-          );
-        }
-        return;
-      }
-
-      // Handle text messages (control messages)
+      // Handle text messages (control messages) first
       final text = message.text;
       if (text.isNotEmpty && text.startsWith('{')) {
         // Parse JSON control message
@@ -212,6 +197,25 @@ class WebRTCService {
           _currentFileBytesReceived = 0;
           _fileChunks.clear();
         }
+      } else {
+        // Handle binary data (file chunks)
+        try {
+          final binary = message.binary;
+          if (binary.isNotEmpty) {
+            _fileChunks.add(binary);
+            _currentFileBytesReceived += binary.length;
+
+            if (_currentFileSize != null) {
+              onFileReceiveProgress?.call(
+                _currentFileBytesReceived,
+                _currentFileSize!,
+              );
+            }
+          }
+        } catch (e) {
+          // If binary access fails, it's likely a text message
+          print('Error accessing binary data: $e');
+        }
       }
     } catch (e) {
       print('Error handling data channel message: $e');
@@ -219,49 +223,6 @@ class WebRTCService {
     }
   }
 
-  void _startAnswerPolling(String fromDeviceId) {
-    _answerPollTimer?.cancel();
-    _answerPollTimer = Timer.periodic(const Duration(seconds: 1), (
-      timer,
-    ) async {
-      try {
-        if (_remoteDeviceId == null) {
-          timer.cancel();
-          return;
-        }
-
-        final response = await ApiService.getWebRTCSignals(
-          deviceId: fromDeviceId,
-        );
-        final signals = response['signals'] as List?;
-
-        if (signals != null) {
-          for (final signal in signals) {
-            final signalType = signal['signalType'] as String;
-            final signalFromDeviceId = signal['fromDeviceId'] as String;
-
-            if (signalFromDeviceId == _remoteDeviceId) {
-              if (signalType == 'answer') {
-                await handleAnswer(
-                  sdp: signal['sdp'] as String,
-                  type: signal['type'] as String,
-                );
-                timer.cancel();
-              } else if (signalType == 'ice-candidate') {
-                await handleIceCandidate(
-                  candidate: signal['candidate'] as String,
-                  sdpMid: signal['sdpMid'] as String,
-                  sdpMLineIndex: signal['sdpMLineIndex'].toString(),
-                );
-              }
-            }
-          }
-        }
-      } catch (e) {
-        print('Error polling answer: $e');
-      }
-    });
-  }
 
   Future<void> handleIncomingFileTransfer({
     required String fromDeviceId,
@@ -314,7 +275,10 @@ class WebRTCService {
       final answer = await _peerConnection!.createAnswer();
       await _peerConnection!.setLocalDescription(answer);
 
-      // Send answer to server
+      // Register with FCMService to receive ICE candidates
+      FCMService.setActiveWebRTCService(this, fromDeviceId);
+
+      // Send answer to server (will trigger FCM to initiator device)
       final prefs = await SharedPreferences.getInstance();
       final myDeviceId = prefs.getString('deviceId');
       if (myDeviceId != null) {
@@ -386,8 +350,6 @@ class WebRTCService {
   }
 
   void _cleanup() {
-    _answerPollTimer?.cancel();
-    _answerPollTimer = null;
     _dataChannel?.close();
     _peerConnection?.close();
     _signalingChannel?.sink.close();
@@ -399,6 +361,9 @@ class WebRTCService {
     _currentFileName = null;
     _currentFileSize = null;
     _currentFileBytesReceived = 0;
+    
+    // Unregister from FCMService
+    FCMService.clearActiveWebRTCService();
   }
 
   void dispose() {

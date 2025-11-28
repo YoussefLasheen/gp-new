@@ -128,23 +128,26 @@ class SignalingServer {
 
         _pendingSignals[deviceId]!.add(signal);
 
-        // Send FCM notification if it's an offer
-        if (signalType == 'offer' &&
-            targetDevice.fcmToken != null &&
-            messaging != null) {
+        // Send FCM data message for WebRTC signals (offer, answer, ice-candidate)
+        if (targetDevice.fcmToken != null && messaging != null) {
           final fromDevice = _devices[fromDeviceId];
           final fromDeviceName = fromDevice?.deviceName ?? 'Unknown';
 
           try {
-            await _sendFcmNotification(
+            await _sendFcmDataMessage(
               fcmToken: targetDevice.fcmToken!,
               fromDeviceId: fromDeviceId,
               fromDeviceName: fromDeviceName,
-              signalType: 'webrtc_offer',
+              signalType: signalType,
+              sdp: signal['sdp'],
+              type: signal['type'],
+              candidate: signal['candidate'],
+              sdpMid: signal['sdpMid'],
+              sdpMLineIndex: signal['sdpMLineIndex'],
             );
           } catch (e) {
-            // Ignore FCM failures for offer notifications but log for visibility.
-            print('Failed to send offer notification: $e');
+            // Ignore FCM failures but log for visibility.
+            print('Failed to send FCM data message: $e');
           }
         }
 
@@ -269,6 +272,52 @@ class SignalingServer {
     });
 
     return router;
+  }
+
+  Future<String> _sendFcmDataMessage({
+    required String fcmToken,
+    required String fromDeviceId,
+    required String fromDeviceName,
+    required String signalType,
+    String? sdp,
+    String? type,
+    String? candidate,
+    String? sdpMid,
+    String? sdpMLineIndex,
+  }) async {
+    final messagingClient = messaging;
+    if (messagingClient == null) {
+      throw StateError('FCM messaging not configured');
+    }
+
+    // Build data payload with all WebRTC signal information
+    final data = <String, String>{
+      'type': signalType,
+      'fromDeviceId': fromDeviceId,
+      'fromDeviceName': fromDeviceName,
+    };
+
+    // Add SDP data if present (for offer/answer)
+    if (sdp != null && type != null) {
+      data['sdp'] = sdp;
+      data['sdpType'] = type;
+    }
+
+    // Add ICE candidate data if present
+    if (candidate != null && sdpMid != null && sdpMLineIndex != null) {
+      data['candidate'] = candidate;
+      data['sdpMid'] = sdpMid;
+      data['sdpMLineIndex'] = sdpMLineIndex;
+    }
+
+    // Send data-only message (no notification) for WebRTC signals
+    return messagingClient.send(
+      TokenMessage(
+        token: fcmToken,
+        data: data,
+        // No notification - this is a silent data message
+      ),
+    );
   }
 
   Future<String> _sendFcmNotification({
