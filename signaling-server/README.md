@@ -9,22 +9,30 @@ Dart-based signaling server for WebRTC peer-to-peer communication.
 dart pub get
 ```
 
-2. Create a `.env` file from `.env.example`:
+2. Run the server using `--dart-define` values (recommended):
 ```bash
-cp .env.example .env
+dart run \
+  -DHOST=0.0.0.0 \
+  -DPORT=8080 \
+  -DFIREBASE_PROJECT_ID=your_project_id \
+  -DFIREBASE_SERVICE_ACCOUNT_FILE=/absolute/path/to/serviceAccount.json \
+  bin/main.dart
 ```
 
-3. Edit `.env` and add your FCM server key:
-```
-PORT=8080
-HOST=localhost
-FCM_SERVER_KEY=your_fcm_server_key_here
-```
+   - **HOST**: Interface to bind to (defaults to `localhost` if not provided).
+   - **PORT**: Port number (defaults to `8080` if not provided).
+   - **FIREBASE_PROJECT_ID**: Firebase project ID used by the Admin SDK.
+   - **FIREBASE_SERVICE_ACCOUNT_FILE**: Absolute path to a Firebase service account JSON file.
 
-4. Run the server:
-```bash
-dart run bin/main.dart
-```
+   You can also configure Firebase credentials using standard environment variables:
+
+   - `FIREBASE_PROJECT_ID`
+   - `FIREBASE_SERVICE_ACCOUNT_FILE`
+   - `GOOGLE_APPLICATION_CREDENTIALS` (file path)
+
+   If these values are missing or invalid, FCM notifications will be disabled automatically.
+
+You can also set these at build/run time with any process manager or container orchestration tool that supports passing `-D` flags to `dart run`.
 
 ## API Endpoints
 

@@ -1,37 +1,108 @@
 import 'dart:io';
+
+import 'package:dart_firebase_admin/dart_firebase_admin.dart';
+import 'package:dart_firebase_admin/messaging.dart';
 import 'package:signaling_server/server.dart';
-import 'package:dotenv/dotenv.dart' as dotenv;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
+const _defineHost = String.fromEnvironment('HOST');
+const _definePort = String.fromEnvironment('PORT');
+const _defineFirebaseProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+const _defineServiceAccountFile =
+    String.fromEnvironment('FIREBASE_SERVICE_ACCOUNT_FILE');
+const _defineGoogleCredentials =
+    String.fromEnvironment('GOOGLE_APPLICATION_CREDENTIALS');
+
 void main(List<String> args) async {
-  // Load environment variables
-  dotenv.load();
+  final host = _defineHost.isEmpty
+      ? (Platform.environment['HOST'] ?? 'localhost')
+      : _defineHost;
+  final portEnv = _definePort.isEmpty
+      ? (Platform.environment['PORT'] ?? '8080')
+      : _definePort;
+  final port = int.tryParse(portEnv) ?? 8080;
+  final resolvedHost = InternetAddress(host);
 
-  final fcmServerKey = dotenv.env['FCM_SERVER_KEY'];
+  final firebaseProjectId = _defineFirebaseProjectId.isEmpty
+      ? (Platform.environment['FIREBASE_PROJECT_ID'] ?? '')
+      : _defineFirebaseProjectId;
+  final firebaseCredentialsPath = _firstNonEmpty([
+    _defineServiceAccountFile,
+    _defineGoogleCredentials,
+    Platform.environment['FIREBASE_SERVICE_ACCOUNT_FILE'] ?? '',
+    Platform.environment['GOOGLE_APPLICATION_CREDENTIALS'] ?? '',
+  ]);
 
-  final server = SignalingServer(fcmServerKey: fcmServerKey);
-  
-  final port = int.parse(dotenv.env['PORT'] ?? '8080');
-  final host = InternetAddress(dotenv.env['HOST'] ?? 'localhost');
+  FirebaseAdminApp? firebaseApp;
+  Messaging? messaging;
 
-  print('Starting signaling server on ${host.address}:$port');
-  if (fcmServerKey == null) {
-    print('Warning: FCM_SERVER_KEY not set. FCM notifications will not work.');
+  if (firebaseProjectId.isEmpty || firebaseCredentialsPath.isEmpty) {
+    stdout.writeln(
+      'Warning: Firebase credentials not configured. FCM notifications are disabled.',
+    );
+  } else if (!File(firebaseCredentialsPath).existsSync()) {
+    stderr.writeln(
+      'Firebase credentials file not found at $firebaseCredentialsPath. '
+      'FCM notifications are disabled.',
+    );
+  } else {
+    try {
+      final credential =
+          Credential.fromServiceAccount(File(firebaseCredentialsPath));
+      firebaseApp = FirebaseAdminApp.initializeApp(
+        firebaseProjectId,
+        credential,
+      );
+      messaging = Messaging(firebaseApp);
+      stdout
+          .writeln('Firebase Admin initialized for project $firebaseProjectId');
+    } catch (e) {
+      stderr.writeln('Failed to initialize Firebase Admin: $e');
+    }
   }
+
+  final server = SignalingServer(messaging: messaging);
+
+  stdout.writeln(
+    'Starting signaling server on ${resolvedHost.address}:$port',
+  );
 
   final serverInstance = await shelf_io.serve(
     server.handler,
-    host,
+    resolvedHost,
     port,
   );
 
-  print('Server running on http://${serverInstance.address.address}:${serverInstance.port}');
-  
-  // Handle shutdown gracefully
-  ProcessSignal.sigint.watch().listen((signal) {
-    print('\nShutting down server...');
-    serverInstance.close();
-    exit(0);
-  });
+  stdout.writeln(
+    'Server running on http://${serverInstance.address.address}:${serverInstance.port}',
+  );
+
+  var isShuttingDown = false;
+  Future<void> shutdown(int exitCode) async {
+    if (isShuttingDown) {
+      return;
+    }
+    isShuttingDown = true;
+    stdout.writeln('\nShutting down server...');
+    await serverInstance.close();
+    if (firebaseApp != null) {
+      await firebaseApp.close();
+    }
+    exit(exitCode);
+  }
+
+  for (final signal in [ProcessSignal.sigint, ProcessSignal.sigterm]) {
+    signal.watch().listen((_) {
+      shutdown(0);
+    });
+  }
 }
 
+String _firstNonEmpty(List<String> values) {
+  for (final value in values) {
+    if (value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+  return '';
+}
