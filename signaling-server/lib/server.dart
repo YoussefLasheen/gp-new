@@ -89,7 +89,7 @@ class SignalingServer {
         }
 
         final body = await request.readAsString();
-        final data = jsonDecode(body) as Map<String, String>;
+        final data = jsonDecode(body) as Map<String, dynamic>;
 
         // Send FCM data message directly with SDP/ICE candidate data included
         // No need to store signals since everything goes through FCM
@@ -97,7 +97,7 @@ class SignalingServer {
           try {
             await _sendFcmDataMessage(
               fcmToken: targetDevice.fcmToken!,
-              data: data,
+              data: data.cast<String, String>(),
             );
           } catch (e) {
             // Log FCM failures for visibility
