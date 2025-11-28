@@ -15,10 +15,15 @@ void main(List<String> args) async {
   if (_defineHost.isEmpty ||
       _definePort.isEmpty ||
       _defineFirebaseProjectId.isEmpty ||
-      _defineServiceAccountFile.isEmpty ||
-      !File(_defineServiceAccountFile).existsSync()) {
+      _defineServiceAccountFile.isEmpty) {
     stdout.writeln(
       'Warning: Required environment variables not configured. FCM notifications are disabled.',
+    );
+    return;
+  }
+  if (!File(_defineServiceAccountFile).existsSync()) {
+    stdout.writeln(
+      'Warning: Firebase credentials file not found at $_defineServiceAccountFile. FCM notifications are disabled.',
     );
     return;
   }
