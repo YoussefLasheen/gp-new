@@ -10,28 +10,15 @@ const _definePort = String.fromEnvironment('PORT');
 const _defineFirebaseProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
 const _defineServiceAccountFile =
     String.fromEnvironment('FIREBASE_SERVICE_ACCOUNT_FILE');
-const _defineGoogleCredentials =
-    String.fromEnvironment('GOOGLE_APPLICATION_CREDENTIALS');
 
 void main(List<String> args) async {
-  final host = _defineHost.isEmpty
-      ? (Platform.environment['HOST'] ?? 'localhost')
-      : _defineHost;
-  final portEnv = _definePort.isEmpty
-      ? (Platform.environment['PORT'] ?? '8080')
-      : _definePort;
+  final host = _defineHost;
+  final portEnv = _definePort;
   final port = int.tryParse(portEnv) ?? 8080;
   final resolvedHost = InternetAddress(host);
 
-  final firebaseProjectId = _defineFirebaseProjectId.isEmpty
-      ? (Platform.environment['FIREBASE_PROJECT_ID'] ?? '')
-      : _defineFirebaseProjectId;
-  final firebaseCredentialsPath = _firstNonEmpty([
-    _defineServiceAccountFile,
-    _defineGoogleCredentials,
-    Platform.environment['FIREBASE_SERVICE_ACCOUNT_FILE'] ?? '',
-    Platform.environment['GOOGLE_APPLICATION_CREDENTIALS'] ?? '',
-  ]);
+  final firebaseProjectId = _defineFirebaseProjectId;
+  final firebaseCredentialsPath = _defineServiceAccountFile;
 
   FirebaseAdminApp? firebaseApp;
   Messaging? messaging;

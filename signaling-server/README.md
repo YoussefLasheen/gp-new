@@ -24,14 +24,6 @@ dart run \
    - **FIREBASE_PROJECT_ID**: Firebase project ID used by the Admin SDK.
    - **FIREBASE_SERVICE_ACCOUNT_FILE**: Absolute path to a Firebase service account JSON file.
 
-   You can also configure Firebase credentials using standard environment variables:
-
-   - `FIREBASE_PROJECT_ID`
-   - `FIREBASE_SERVICE_ACCOUNT_FILE`
-   - `GOOGLE_APPLICATION_CREDENTIALS` (file path)
-
-   If these values are missing or invalid, FCM notifications will be disabled automatically.
-
 You can also set these at build/run time with any process manager or container orchestration tool that supports passing `-D` flags to `dart run`.
 
 ## API Endpoints
