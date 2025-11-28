@@ -38,9 +38,10 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     };
 
     widget.webrtcService.onConnectionEnded = () {
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      setState(() {
+        _isConnected = false;
+        _connectionStatus = 'Disconnected';
+      });
     };
 
     widget.webrtcService.onError = (error) {
@@ -49,10 +50,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
           _connectionStatus = 'Error: $error';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $error'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
         );
       }
     };
@@ -112,7 +110,9 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                       if (!_isConnected) ...[
                         const SizedBox(height: 16),
                         const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       ],
                     ],
@@ -167,10 +167,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
           width: 100,
           child: Text(
             label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ),
         Expanded(
@@ -187,4 +184,3 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     );
   }
 }
-
