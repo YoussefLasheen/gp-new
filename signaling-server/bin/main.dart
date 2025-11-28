@@ -20,33 +20,25 @@ void main(List<String> args) async {
   final firebaseProjectId = _defineFirebaseProjectId;
   final firebaseCredentialsPath = _defineServiceAccountFile;
 
-  FirebaseAdminApp? firebaseApp;
-  Messaging? messaging;
-
   if (firebaseProjectId.isEmpty || firebaseCredentialsPath.isEmpty) {
     stdout.writeln(
       'Warning: Firebase credentials not configured. FCM notifications are disabled.',
     );
-  } else if (!File(firebaseCredentialsPath).existsSync()) {
-    stderr.writeln(
-      'Firebase credentials file not found at $firebaseCredentialsPath. '
-      'FCM notifications are disabled.',
-    );
-  } else {
-    try {
-      final credential =
-          Credential.fromServiceAccount(File(firebaseCredentialsPath));
-      firebaseApp = FirebaseAdminApp.initializeApp(
-        firebaseProjectId,
-        credential,
-      );
-      messaging = Messaging(firebaseApp);
-      stdout
-          .writeln('Firebase Admin initialized for project $firebaseProjectId');
-    } catch (e) {
-      stderr.writeln('Failed to initialize Firebase Admin: $e');
-    }
+    return;
   }
+  if (!File(firebaseCredentialsPath).existsSync()) {
+    stderr.writeln(
+        'Firebase credentials file not found at $firebaseCredentialsPath. ');
+    return;
+  }
+
+  final credential =
+      Credential.fromServiceAccount(File(firebaseCredentialsPath));
+  final firebaseApp = FirebaseAdminApp.initializeApp(
+    firebaseProjectId,
+    credential,
+  );
+  final messaging = Messaging(firebaseApp);
 
   final server = SignalingServer(messaging: messaging);
 
@@ -72,9 +64,7 @@ void main(List<String> args) async {
     isShuttingDown = true;
     stdout.writeln('\nShutting down server...');
     await serverInstance.close();
-    if (firebaseApp != null) {
-      await firebaseApp.close();
-    }
+    await firebaseApp.close();
     exit(exitCode);
   }
 
@@ -83,13 +73,4 @@ void main(List<String> args) async {
       shutdown(0);
     });
   }
-}
-
-String _firstNonEmpty(List<String> values) {
-  for (final value in values) {
-    if (value.trim().isNotEmpty) {
-      return value.trim();
-    }
-  }
-  return '';
 }
