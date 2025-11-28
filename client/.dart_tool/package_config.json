@@ -38,10 +38,22 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "cross_file",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/cross_file-0.3.5+1",
+      "packageUri": "lib/",
+      "languageVersion": "3.8"
+    },
+    {
       "name": "crypto",
       "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/crypto-3.0.7",
       "packageUri": "lib/",
       "languageVersion": "3.4"
+    },
+    {
+      "name": "dart_webrtc",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/dart_webrtc-1.6.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
     },
     {
       "name": "device_info_plus",
@@ -72,6 +84,12 @@
       "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/file-7.0.1",
       "packageUri": "lib/",
       "languageVersion": "3.0"
+    },
+    {
+      "name": "file_picker",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/file_picker-8.3.7",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
     },
     {
       "name": "firebase_core",
@@ -128,6 +146,12 @@
       "languageVersion": "3.5"
     },
     {
+      "name": "flutter_plugin_android_lifecycle",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.33",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
+    },
+    {
       "name": "flutter_test",
       "rootUri": "file:///Users/yousseflasheen/fvm/versions/3.35.7/packages/flutter_test",
       "packageUri": "lib/",
@@ -138,6 +162,12 @@
       "rootUri": "file:///Users/yousseflasheen/fvm/versions/3.35.7/packages/flutter_web_plugins",
       "packageUri": "lib/",
       "languageVersion": "3.8"
+    },
+    {
+      "name": "flutter_webrtc",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/flutter_webrtc-0.9.48+hotfix.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
     },
     {
       "name": "http",
@@ -182,6 +212,12 @@
       "languageVersion": "3.6"
     },
     {
+      "name": "logging",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/logging-1.3.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "matcher",
       "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/matcher-0.12.17",
       "packageUri": "lib/",
@@ -204,6 +240,24 @@
       "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/path-1.9.1",
       "packageUri": "lib/",
       "languageVersion": "3.4"
+    },
+    {
+      "name": "path_provider",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/path_provider-2.1.5",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "path_provider_android",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/path_provider_android-2.2.22",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
+    },
+    {
+      "name": "path_provider_foundation",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/path_provider_foundation-2.5.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
     },
     {
       "name": "path_provider_linux",
@@ -308,6 +362,12 @@
       "languageVersion": "3.1"
     },
     {
+      "name": "synchronized",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/synchronized-3.4.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.8"
+    },
+    {
       "name": "term_glyph",
       "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/term_glyph-1.2.2",
       "packageUri": "lib/",
@@ -348,6 +408,18 @@
       "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/web-1.1.1",
       "packageUri": "lib/",
       "languageVersion": "3.4"
+    },
+    {
+      "name": "web_socket_channel",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/web_socket_channel-2.4.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.15"
+    },
+    {
+      "name": "webrtc_interface",
+      "rootUri": "file:///Users/yousseflasheen/.pub-cache/hosted/pub.dev/webrtc_interface-1.3.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
     },
     {
       "name": "win32",

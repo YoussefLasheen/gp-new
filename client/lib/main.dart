@@ -9,7 +9,7 @@ import 'services/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase
   try {
     await Firebase.initializeApp();
@@ -57,7 +57,7 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _checkRegistration() async {
     final prefs = await SharedPreferences.getInstance();
     final deviceId = prefs.getString('deviceId');
-    
+
     if (deviceId != null && deviceId.isNotEmpty) {
       setState(() {
         _isRegistered = true;
@@ -86,6 +86,14 @@ class _MainScreenState extends State<MainScreen> {
           deviceName: deviceName,
           fcmToken: fcmToken,
         );
+
+        // Configure FCM handlers for WebRTC
+        if (mounted) {
+          FCMService.configureMessageHandlers(
+            deviceId: deviceId,
+            context: context,
+          );
+        }
       }
     } catch (e) {
       print('Error sending user info on start: $e');
@@ -93,11 +101,15 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   @override
+  void dispose() {
+    FCMService.stopPolling();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_isRegistered) {
@@ -107,4 +119,3 @@ class _MainScreenState extends State<MainScreen> {
     return const SignUpScreen();
   }
 }
-

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/webrtc_service.dart';
+import 'call_screen.dart';
 
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
@@ -56,7 +58,10 @@ class _UsersListScreenState extends State<UsersListScreen> {
     }
   }
 
-  Future<void> _sendConnectionRequest(String targetDeviceId, String targetDeviceName) async {
+  Future<void> _sendConnectionRequest(
+    String targetDeviceId,
+    String targetDeviceName,
+  ) async {
     if (_currentDeviceId == null || _currentDeviceName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -68,17 +73,26 @@ class _UsersListScreenState extends State<UsersListScreen> {
     }
 
     try {
-      await ApiService.sendConnectionRequest(
+      // Initialize WebRTC service
+      final webrtcService = WebRTCService();
+      await webrtcService.initialize();
+
+      // Start the file transfer connection
+      await webrtcService.startFileTransfer(
         targetDeviceId: targetDeviceId,
         fromDeviceId: _currentDeviceId!,
         fromDeviceName: _currentDeviceName!,
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Connection request sent to $targetDeviceName'),
-            backgroundColor: Colors.green,
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => FileSendScreen(
+              remoteDeviceName: targetDeviceName,
+              remoteDeviceId: targetDeviceId,
+              isIncoming: false,
+              webrtcService: webrtcService,
+            ),
           ),
         );
       }
@@ -86,7 +100,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error sending connection request: $e'),
+            content: Text('Error starting file transfer: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -111,95 +125,82 @@ class _UsersListScreenState extends State<UsersListScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _users.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.people_outline,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No users found',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Pull to refresh',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No users found',
+                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadUsers,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: _users.length,
-                    itemBuilder: (context, index) {
-                      final user = _users[index];
-                      final deviceId = user['deviceId'] as String;
-                      final deviceName = user['deviceName'] as String;
-                      final isCurrentUser = deviceId == _currentDeviceId;
+                  const SizedBox(height: 8),
+                  Text(
+                    'Pull to refresh',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadUsers,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: _users.length,
+                itemBuilder: (context, index) {
+                  final user = _users[index];
+                  final deviceId = user['deviceId'] as String;
+                  final deviceName = user['deviceName'] as String;
+                  final isCurrentUser = deviceId == _currentDeviceId;
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                  return Card(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: isCurrentUser
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey[300],
+                        child: Icon(
+                          Icons.person,
+                          color: isCurrentUser
+                              ? Colors.white
+                              : Colors.grey[700],
                         ),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: isCurrentUser
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.grey[300],
-                            child: Icon(
-                              Icons.person,
-                              color: isCurrentUser ? Colors.white : Colors.grey[700],
-                            ),
-                          ),
-                          title: Text(
-                            deviceName,
-                            style: TextStyle(
-                              fontWeight: isCurrentUser
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                          subtitle: Text(
-                            deviceId.substring(0, 8) + '...',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          trailing: isCurrentUser
-                              ? Chip(
-                                  label: const Text('You'),
-                                  backgroundColor:
-                                      Theme.of(context).colorScheme.primaryContainer,
-                                )
-                              : IconButton(
-                                  icon: const Icon(Icons.video_call),
-                                  onPressed: () => _sendConnectionRequest(
-                                    deviceId,
-                                    deviceName,
-                                  ),
-                                  tooltip: 'Send connection request',
-                                ),
+                      ),
+                      title: Text(
+                        deviceName,
+                        style: TextStyle(
+                          fontWeight: isCurrentUser
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                      subtitle: Text(
+                        deviceId.substring(0, 8) + '...',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      trailing: isCurrentUser
+                          ? Chip(
+                              label: const Text('You'),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.file_upload),
+                              onPressed: () =>
+                                  _sendConnectionRequest(deviceId, deviceName),
+                              tooltip: 'Send file',
+                            ),
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }
-

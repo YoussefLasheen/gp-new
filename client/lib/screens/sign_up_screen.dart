@@ -51,7 +51,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       // Configure FCM message handlers
-      FCMService.configureMessageHandlers();
+      if (mounted) {
+        FCMService.configureMessageHandlers(
+          deviceId: deviceId,
+          context: context,
+        );
+      }
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
