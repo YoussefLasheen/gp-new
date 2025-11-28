@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
@@ -11,20 +10,15 @@ class WebRTCService {
   String? _remoteDeviceId;
 
   // Callbacks
-  Function()? onDataChannelReady;
+  Function()? onConnectionReady;
   Function()? onConnectionEnded;
   Function(String)? onError;
-  Function(String fileName, int fileSize)? onFileReceiveStart;
-  Function(int bytesReceived, int totalBytes)? onFileReceiveProgress;
-  Function(Uint8List fileData, String fileName)? onFileReceived;
-  Function(int bytesSent, int totalBytes)? onFileSendProgress;
-  Function()? onFileSendComplete;
 
   Future<void> initialize() async {
-    // No need for media streams for file transfer
+    // No need for media streams for data channel connection
   }
 
-  Future<void> startFileTransfer({
+  Future<void> startConnection({
     required String targetDeviceId,
     required String fromDeviceId,
     required String fromDeviceName,
@@ -39,12 +33,10 @@ class WebRTCService {
         ],
       });
 
-      // Create data channel
+      // Create data channel for connection verification
       _dataChannel = await _peerConnection!.createDataChannel(
-        'fileTransfer',
-        RTCDataChannelInit()
-          ..ordered = true
-          ..maxRetransmits = 3,
+        'dataChannel',
+        RTCDataChannelInit()..ordered = true,
       );
 
       _setupDataChannel();
@@ -68,7 +60,7 @@ class WebRTCService {
           onConnectionEnded?.call();
         } else if (state ==
             RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
-          onDataChannelReady?.call();
+          onConnectionReady?.call();
         }
       };
 
@@ -88,7 +80,7 @@ class WebRTCService {
         type: offer.type,
       );
     } catch (e) {
-      onError?.call('Failed to start file transfer: $e');
+      onError?.call('Failed to start connection: $e');
       _cleanup();
     }
   }
@@ -98,130 +90,18 @@ class WebRTCService {
 
     _dataChannel!.onDataChannelState = (RTCDataChannelState state) {
       if (state == RTCDataChannelState.RTCDataChannelOpen) {
-        onDataChannelReady?.call();
+        onConnectionReady?.call();
       }
     };
 
+    // Data channel is ready - connection is established
     _dataChannel!.onMessage = (RTCDataChannelMessage message) {
-      _handleDataChannelMessage(message);
+      // Connection is established and working
+      print('Data channel message received: ${message.text}');
     };
   }
 
-  Future<void> sendFile(Uint8List fileData, String fileName) async {
-    if (_dataChannel == null ||
-        _dataChannel!.state != RTCDataChannelState.RTCDataChannelOpen) {
-      onError?.call('Data channel not ready');
-      return;
-    }
-
-    try {
-      final totalBytes = fileData.length;
-      const chunkSize = 16 * 1024; // 16KB chunks
-      int offset = 0;
-
-      // Send file metadata first
-      final metadata =
-          '{"type":"file_start","fileName":"$fileName","fileSize":$totalBytes}';
-      _dataChannel!.send(RTCDataChannelMessage(metadata));
-
-      // Send file in chunks
-      while (offset < totalBytes) {
-        final end = (offset + chunkSize < totalBytes)
-            ? offset + chunkSize
-            : totalBytes;
-        final chunk = fileData.sublist(offset, end);
-
-        _dataChannel!.send(RTCDataChannelMessage.fromBinary(chunk));
-
-        offset = end;
-
-        // Report progress
-        onFileSendProgress?.call(offset, totalBytes);
-
-        // Small delay to prevent overwhelming the channel
-        await Future.delayed(const Duration(milliseconds: 10));
-      }
-
-      // Send completion message
-      _dataChannel!.send(RTCDataChannelMessage('{"type":"file_complete"}'));
-      onFileSendComplete?.call();
-    } catch (e) {
-      onError?.call('Failed to send file: $e');
-    }
-  }
-
-  String? _currentFileName;
-  int? _currentFileSize;
-  int _currentFileBytesReceived = 0;
-  final List<Uint8List> _fileChunks = [];
-
-  void _handleDataChannelMessage(RTCDataChannelMessage message) {
-    try {
-      // Handle text messages (control messages) first
-      final text = message.text;
-      if (text.isNotEmpty && text.startsWith('{')) {
-        // Parse JSON control message
-        if (text.contains('"type":"file_start"')) {
-          // Extract metadata (simplified - use proper JSON parsing in production)
-          final nameMatch = RegExp(r'"fileName":"([^"]+)"').firstMatch(text);
-          final sizeMatch = RegExp(r'"fileSize":(\d+)').firstMatch(text);
-
-          if (nameMatch != null && sizeMatch != null) {
-            _currentFileName = nameMatch.group(1);
-            _currentFileSize = int.parse(sizeMatch.group(1)!);
-            _currentFileBytesReceived = 0;
-            _fileChunks.clear();
-
-            onFileReceiveStart?.call(_currentFileName!, _currentFileSize!);
-          }
-        } else if (text.contains('"type":"file_complete"')) {
-          // Combine all chunks
-          final totalSize = _fileChunks.fold<int>(
-            0,
-            (sum, chunk) => sum + chunk.length,
-          );
-          final fileData = Uint8List(totalSize);
-          int offset = 0;
-          for (final chunk in _fileChunks) {
-            fileData.setRange(offset, offset + chunk.length, chunk);
-            offset += chunk.length;
-          }
-
-          onFileReceived?.call(fileData, _currentFileName ?? 'unknown');
-
-          // Reset
-          _currentFileName = null;
-          _currentFileSize = null;
-          _currentFileBytesReceived = 0;
-          _fileChunks.clear();
-        }
-      } else {
-        // Handle binary data (file chunks)
-        try {
-          final binary = message.binary;
-          if (binary.isNotEmpty) {
-            _fileChunks.add(binary);
-            _currentFileBytesReceived += binary.length;
-
-            if (_currentFileSize != null) {
-              onFileReceiveProgress?.call(
-                _currentFileBytesReceived,
-                _currentFileSize!,
-              );
-            }
-          }
-        } catch (e) {
-          // If binary access fails, it's likely a text message
-          print('Error accessing binary data: $e');
-        }
-      }
-    } catch (e) {
-      print('Error handling data channel message: $e');
-      onError?.call('Error receiving file: $e');
-    }
-  }
-
-  Future<void> handleIncomingFileTransfer({
+  Future<void> handleIncomingConnection({
     required String fromDeviceId,
     required String sdp,
     required String type,
@@ -259,7 +139,7 @@ class WebRTCService {
           onConnectionEnded?.call();
         } else if (state ==
             RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
-          onDataChannelReady?.call();
+          onConnectionReady?.call();
         }
       };
 
@@ -288,7 +168,7 @@ class WebRTCService {
         );
       }
     } catch (e) {
-      onError?.call('Failed to handle incoming file transfer: $e');
+      onError?.call('Failed to handle incoming connection: $e');
       _cleanup();
     }
   }
@@ -353,10 +233,6 @@ class WebRTCService {
     _peerConnection = null;
     _dataChannel = null;
     _remoteDeviceId = null;
-    _fileChunks.clear();
-    _currentFileName = null;
-    _currentFileSize = null;
-    _currentFileBytesReceived = 0;
 
     // Unregister from FCMService
     FCMService.clearActiveWebRTCService();

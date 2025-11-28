@@ -1,7 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'webrtc_service.dart';
-import '../screens/call_screen.dart';
+import '../screens/connection_screen.dart';
 
 class FCMService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -118,7 +118,7 @@ class FCMService {
 
     scaffoldMessenger.showSnackBar(
       SnackBar(
-        content: Text('$fromDeviceName wants to send you a file'),
+        content: Text('$fromDeviceName wants to connect'),
         duration: const Duration(seconds: 10),
         backgroundColor: Colors.blue[700],
         action: SnackBarAction(
@@ -159,18 +159,18 @@ class FCMService {
       _activeWebRTCService = webrtcService;
       _activeRemoteDeviceId = fromDeviceId;
 
-      // Handle the incoming file transfer offer
-      await webrtcService.handleIncomingFileTransfer(
+      // Handle the incoming connection offer
+      await webrtcService.handleIncomingConnection(
         fromDeviceId: fromDeviceId,
         sdp: sdp,
         type: type,
       );
 
-      // Navigate to file send screen
+      // Navigate to connection screen
       if (context.mounted) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => FileSendScreen(
+            builder: (context) => ConnectionScreen(
               remoteDeviceName: fromDeviceName,
               remoteDeviceId: fromDeviceId,
               isIncoming: true,
@@ -180,11 +180,11 @@ class FCMService {
         );
       }
     } catch (e) {
-      print('Error accepting incoming file transfer: $e');
+      print('Error accepting incoming connection: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error accepting file transfer: $e'),
+            content: Text('Error accepting connection: $e'),
             backgroundColor: Colors.red,
           ),
         );

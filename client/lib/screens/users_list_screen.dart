@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/webrtc_service.dart';
-import 'call_screen.dart';
+import 'connection_screen.dart';
 
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
@@ -77,8 +77,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
       final webrtcService = WebRTCService();
       await webrtcService.initialize();
 
-      // Start the file transfer connection
-      await webrtcService.startFileTransfer(
+      // Start the WebRTC connection
+      await webrtcService.startConnection(
         targetDeviceId: targetDeviceId,
         fromDeviceId: _currentDeviceId!,
         fromDeviceName: _currentDeviceName!,
@@ -87,7 +87,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       if (mounted) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => FileSendScreen(
+            builder: (context) => ConnectionScreen(
               remoteDeviceName: targetDeviceName,
               remoteDeviceId: targetDeviceId,
               isIncoming: false,
@@ -100,7 +100,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error starting file transfer: $e'),
+            content: Text('Error starting connection: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -191,10 +191,10 @@ class _UsersListScreenState extends State<UsersListScreen> {
                               ).colorScheme.primaryContainer,
                             )
                           : IconButton(
-                              icon: const Icon(Icons.file_upload),
+                              icon: const Icon(Icons.call),
                               onPressed: () =>
                                   _sendConnectionRequest(deviceId, deviceName),
-                              tooltip: 'Send file',
+                              tooltip: 'Connect',
                             ),
                     ),
                   );
